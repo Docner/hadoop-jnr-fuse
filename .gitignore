@@ -1,0 +1,7 @@
+/build/
+/dist/
+/nbproject/private/
+/nbproject/genfiles.properties
+/lib/
+/mnt/
+*DS_Store
