@@ -4,4 +4,6 @@
 /nbproject/genfiles.properties
 /lib/
 /mnt/
+/install/
 *DS_Store
+hadoop-jnr-fuse-*.rpm

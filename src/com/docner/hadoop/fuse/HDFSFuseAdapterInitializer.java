@@ -38,6 +38,12 @@ public class HDFSFuseAdapterInitializer implements Initializer {
     public void initialize(Object o) throws InitializationException {
         UserGroupInformation login = login();
         String hdfsSpec = hdfsUrl();
+        boolean fuseDebug = fuseDebug();
+        boolean fuseBlocking = fuseBlocking();
+        String[] fuseOptions = new String[0];
+        if (o != null && o instanceof String[]) {
+            fuseOptions = (String[]) o;
+        }
 
         String username = login.getUserName();
         Configuration conf = new Configuration();
@@ -70,7 +76,7 @@ public class HDFSFuseAdapterInitializer implements Initializer {
         ensureDirectory(conf, home, username);
         HDFSFuseAdapter adapter = makeAdapterWithDirectory(login, conf, username, home);
 
-        adapter.mount(Paths.get(mountPath()), true, true, new String[0]);
+        adapter.mount(Paths.get(mountPath()), fuseBlocking, fuseDebug, fuseOptions);
     }
 
     protected HDFSFuseAdapter makeAdapterWithDirectory(UserGroupInformation login, Configuration conf, String username, Path home) throws InitializationException {
@@ -163,6 +169,23 @@ public class HDFSFuseAdapterInitializer implements Initializer {
         spec = params.get(this, "mountPath");
         LOG.log(Level.INFO, "Mounting on {0}", spec);
         return spec;
+    }
+
+    public boolean fuseDebug() {
+        return readBoolean("fuseDebug", false);
+    }
+
+    public boolean fuseBlocking() {
+        return readBoolean("fuseBlocking", false);
+    }
+
+    public boolean readBoolean(String name, boolean defaultValue) {
+        String spec = Boolean.toString(defaultValue);
+        InitializationParameters params = require(InitializationParameters.class);
+        params.fallback(this, name, spec);
+        spec = params.get(this, name);
+        LOG.log(Level.INFO, "With FUSE {1} {0}", new Object[]{spec, name});
+        return "true".equalsIgnoreCase(spec);
     }
 
     public static void main(String[] args) throws InitializationException {

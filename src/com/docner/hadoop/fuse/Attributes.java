@@ -1,14 +1,18 @@
 package com.docner.hadoop.fuse;
 
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import jnr.constants.platform.OpenFlags;
 import jnr.posix.util.Platform;
 
 import org.apache.hadoop.fs.FileStatus;
 import ru.serce.jnrfuse.struct.FileStat;
 
 class Attributes {
+
     private static final Logger LOG = Logger.getLogger(Attributes.class.getName());
 
     // uid/gid are overwritten by fuse mount options -ouid=...
@@ -52,5 +56,85 @@ class Attributes {
             stat.st_flags.set(0);
             stat.st_gen.set(0);
         }
+    }
+
+    public static Set<OpenFlags> opening(long openflags) {
+
+        EnumSet<OpenFlags> flags = EnumSet.noneOf(OpenFlags.class);
+
+        // these from fedora linux /usr/include/bits/fcntl-linux.h
+        if ((openflags & 1) > 0) {
+            flags.add(OpenFlags.O_WRONLY);
+        } else {
+            flags.add(OpenFlags.O_RDONLY);
+        }
+        if ((openflags & 2) > 0) {
+            flags.add(OpenFlags.O_RDWR);
+        }
+
+        if ((openflags & 0100) > 0) {
+            flags.add(OpenFlags.O_CREAT);
+        }
+        if ((openflags & 0200) > 0) {
+            flags.add(OpenFlags.O_EXCL);
+        }
+        if ((openflags & 0400) > 0) {
+            flags.add(OpenFlags.O_NOCTTY);
+        }
+        if ((openflags & 01000) > 0) {
+            flags.add(OpenFlags.O_TRUNC);
+        }
+        if ((openflags & 02000) > 0) {
+            flags.add(OpenFlags.O_APPEND);
+        }
+        if ((openflags & 04000) > 0) {
+            flags.add(OpenFlags.O_NONBLOCK);
+        }
+
+        if ((openflags & 04000000) > 0 && (openflags & 010000) > 0) {
+            flags.add(OpenFlags.O_FSYNC);
+        }
+        if ((openflags & 020000) > 0) {
+            flags.add(OpenFlags.O_ASYNC);
+        }
+
+        if ((openflags & 0100000) > 0) {
+            //flags.add(OpenFlags.O_LARGEFILE);
+        }
+        if ((openflags & 0200000) > 0) {
+            flags.add(OpenFlags.O_DIRECTORY);
+        }
+        if ((openflags & 0400000) > 0) {
+            flags.add(OpenFlags.O_NOFOLLOW);
+        }
+        if ((openflags & 02000000) > 0) {
+            flags.add(OpenFlags.O_CLOEXEC);
+        }
+        if ((openflags & 040000) > 0) {
+            //flags.add(OpenFlags.O_DIRECT);
+        }
+        if ((openflags & 01000000) > 0) {
+            //flags.add(OpenFlags.O_NOATIME);
+        }
+        if ((openflags & 010000000) > 0) {
+            //flags.add(OpenFlags.O_PATH);
+        }
+        if ((openflags & 010000) > 0) {
+            //flags.add(OpenFlags.O_DSYNC);
+        }
+        if ((openflags & 020000000) > 0 && (openflags & 0200000) > 0) {
+            flags.add(OpenFlags.O_TMPFILE);
+        }
+
+        // 2 POSIX flags not known to fedora.
+        // https://unix.superglobalmegacorp.com/Net2/newsrc/sys/fcntl.h.html
+        if ((openflags & 0x10) > 0) {
+            flags.add(OpenFlags.O_SHLOCK);
+        }
+        if ((openflags & 0x20) > 0) {
+            flags.add(OpenFlags.O_EXLOCK);
+        }
+
+        return flags;
     }
 }

@@ -84,11 +84,9 @@ class OpenFile implements AutoCloseable {
             } else if (exists && flags.contains(OpenFlags.O_EXCL) && flags.contains(OpenFlags.O_CREAT)) {
                 throw new FileAlreadyExistsException(path.toString());
             } else {
-                LOG.log(Level.INFO, "Creating new {0} {1}", new Object[]{path, exists ? "(overwriting old)" : ""});
                 out = hadoop.create(path, true);
             }
-        }
-        if (flags.contains(OpenFlags.O_RDONLY) && (!flags.contains(OpenFlags.O_CREAT))) {
+        } else if (!flags.contains(OpenFlags.O_CREAT)) {
             if (flags.contains(OpenFlags.O_RDWR)) {
                 LOG.log(Level.WARNING, "Treating O_RDWR as READ ONLY: {0}", path.toUri().toASCIIString());
             }
@@ -104,7 +102,6 @@ class OpenFile implements AutoCloseable {
             }
         }
         return new OpenFile(hadoop, status, in, out, flags);
-
     }
 
     /**

@@ -13,6 +13,7 @@ import ru.serce.jnrfuse.struct.Statvfs;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import static java.util.Arrays.asList;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -30,16 +31,18 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import static ru.serce.jnrfuse.flags.AccessConstants.R_OK;
 import static ru.serce.jnrfuse.flags.AccessConstants.W_OK;
 import static ru.serce.jnrfuse.flags.AccessConstants.X_OK;
 import ru.serce.jnrfuse.flags.XAttrConstants;
+import ru.serce.jnrfuse.struct.Timespec;
 
 /**
  * FUSE-HDFSFuseAdapter for HDFS based on Sergey Tselovalnikov's
- <a href="https://github.com/SerCeMan/jnr-fuse/blob/0.5.1/src/main/java/ru/serce/jnrfuse/examples/HelloFuse.java">HelloFuse</a>
+ * <a href="https://github.com/SerCeMan/jnr-fuse/blob/0.5.1/src/main/java/ru/serce/jnrfuse/examples/HelloFuse.java">HelloFuse</a>
  * <a href="https://www.cs.hmc.edu/~geoff/classes/hmc.cs135.201001/homework/fuse/fuse_doc.html">Fuse
  * howto</a>
  */
@@ -168,6 +171,77 @@ public class HDFSFuseAdapter extends FuseStubFS implements AutoCloseable {
     }
 
     @Override
+    public int chmod(String path, long mode) {
+        LOG.log(Level.INFO, "MODE will be set to {0} hex {1} oct {2} for {3}", new Object[]{mode, Long.toHexString(mode), Long.toOctalString(mode), path});
+
+        try {
+            Path node = resolvePath(path);
+
+            FsPermission permission = FsPermission.createImmutable((short) (mode & 0xfff));
+            hdfs.setPermission(node, permission);
+
+            return 0;
+        } catch (FileNotFoundException fnf) {
+            LOG.log(Level.INFO, "no file: {0}", fnf.getMessage());
+            return -ErrorCodes.ENOENT();
+
+        } catch (IOException | RuntimeException e) {
+            LOG.log(Level.WARNING, "statfs " + path + " failed.", e);
+            return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
+    public int utimens(String path, Timespec[] timespec) {
+        long modification = (1000 * timespec[0].tv_sec.longValue());
+        long nanos = timespec[0].tv_nsec.longValue() / 1000;
+
+        long access = (1000 * timespec[1].tv_sec.longValue());
+        long accessnanos = timespec[1].tv_nsec.longValue() / 1000;
+        try {
+            Path node = resolvePath(path);
+
+            hdfs.setTimes(node, (modification + nanos), (access + accessnanos));
+
+            return 0;
+        } catch (FileNotFoundException fnf) {
+            LOG.log(Level.INFO, "no file: {0}", fnf.getMessage());
+            return -ErrorCodes.ENOENT();
+
+        } catch (IOException | RuntimeException e) {
+            LOG.log(Level.WARNING, "statfs " + path + " failed.", e);
+            return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
+    public int truncate(String path, long size) {
+        try {
+            Path node = resolvePath(path);
+
+            if (hdfs.truncate(node, size)) {
+                return 0;
+            }
+            return -ErrorCodes.EIO();
+
+        } catch (RemoteException already) {
+            if (already.getClassName().equals("org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException")) {
+                return 0;
+            }
+            LOG.log(Level.WARNING, "truncate " + path + " failed.", already);
+            return -ErrorCodes.EIO();
+
+        } catch (FileNotFoundException fnf) {
+            LOG.log(Level.INFO, "truncate no file: {0}", fnf.getMessage());
+            return -ErrorCodes.ENOENT();
+
+        } catch (IOException | RuntimeException e) {
+            LOG.log(Level.WARNING, "truncate " + path + " failed.", e);
+            return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
     public int opendir(String path, FuseFileInfo fi) {
         try {
             Path node = resolvePath(path);
@@ -249,7 +323,20 @@ public class HDFSFuseAdapter extends FuseStubFS implements AutoCloseable {
             }
 
             if (status.isFile()) {
-                long handle = files.open(node, BitMaskEnumUtil.bitMaskToSet(OpenFlags.class, fi.flags.longValue()));
+                long openflags = fi.flags.longValue();
+
+                //Set<OpenFlags> flags = BitMaskEnumUtil.bitMaskToSet(OpenFlags.class, fi.flags.longValue());
+                Set<OpenFlags> flags = Attributes.opening(openflags);
+                if ((openflags & 0x8801) == 0x8801) {
+                    LOG.info("touch WORKAROUND for existing file...");
+                    hdfs.setTimes(node, System.currentTimeMillis(), System.currentTimeMillis());
+
+                    flags.remove(OpenFlags.O_WRONLY);
+                    flags.add(OpenFlags.O_RDONLY);
+                }
+
+                LOG.log(Level.INFO, "Opening 0x{0} => {1}", new Object[]{Long.toHexString(openflags), asList(flags)});
+                long handle = files.open(node, flags);
                 fi.fh.set(handle);
                 return 0;
             } else if (status.isDirectory()) {
@@ -502,8 +589,7 @@ public class HDFSFuseAdapter extends FuseStubFS implements AutoCloseable {
             boolean created = hdfs.mkdirs(target, permissions);
             if (created) {
                 return 0;
-            }
-            else{
+            } else {
                 return -ErrorCodes.EIO();
             }
         } catch (IOException | RuntimeException ioe) {

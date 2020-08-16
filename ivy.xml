@@ -14,12 +14,12 @@
     </publications>
     <dependencies>
         <dependency org="com.github.serceman" name="jnr-fuse" rev="0.5.4" conf="compile,runtime->default"/>
-        <dependency org="com.github.jnr" name="jnr-jffi" rev="2.0.10-SNAPSHOT" conf="runtime->default"/>
-        <dependency org="com.github.jnr" name="jffi" rev="1.2.13-SNAPSHOT" conf="runtime->default"/>
+        <dependency org="com.github.jnr" name="jnr-ffi" rev="2.1.17" conf="compile,runtime->runtime"/>
+        <dependency org="com.github.jnr" name="jffi" rev="1.2.24" conf="runtime,compile->complete"/>
+        <dependency org="com.github.jnr" name="jnr-unixsocket" rev="0.34" conf="runtime,compile->runtime"/>
         <dependency org="org.apache.hadoop" name="hadoop-client-api" rev="3.2.1" conf="compile->default"/>
         <dependency org="org.apache.hadoop" name="hadoop-client-runtime" rev="3.2.1" conf="runtime->default"/>
         <dependency org="org.apache.hadoop" name="hadoop-client-runtime" rev="3.2.1" conf="compile-test->default"/>
-        <dependency org="com.github.jsr203hadoop" name="jsr203hadoop" rev="1.0.3" conf="compile,runtime->default"/>
         <dependency org="org.slf4j" name="slf4j-jdk14" rev="1.7.25"  conf="compile->default;runtime->runtime"/>
         
         <!--
