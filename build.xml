@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="hadoop-jnr-fuse" default="default" basedir=".">
+    <description>Builds, tests, and runs the project hadoop-jnr-fuse.</description>
+   <import file="nbproject/build-impl.xml"/>
+    <property name="ant.buildfiles" value="../../buildsystem"/>
+    <import file="${ant.buildfiles}/devlocal/ivy-impl.xml"/>
+    <import file="${ant.buildfiles}/devlocal/build.xml"/>
+</project>
